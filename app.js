@@ -1,5 +1,5 @@
 /* ================= CLÁSICA 2026 — App Administrador ================= */
-const API_BASE = 'PEGA_AQUI_LA_URL_EXEC'; // misma /exec que el frontend participante
+const API_BASE = 'https://script.google.com/macros/s/AKfycbxnc3ajRaV6-v9TSfBnVEdYUyWSKcTkbJlHsjpUV6UHJ--I9euyVdRIJrvpStGA-FBR/exec'; // misma /exec que el frontend participante
 
 const ESTADOS = ['INSCRITO', 'ACTIVO', 'EN_COMPETENCIA', 'FINALIZADO', 'DESCALIFICADO', 'NO_PRESENTADO'];
 const A = { admin: null, cats: [], cfg: {}, inscritos: [], kpis: null, coms: [], poll: null };
