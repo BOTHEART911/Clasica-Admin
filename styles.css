@@ -410,9 +410,16 @@ main { max-width: var(--container-max); margin: 0 auto; padding: 18px 14px calc(
 .modal-head .m-close svg { width: 18px; height: 18px; }
 .modal-body { padding: 20px 22px; overflow-y: auto; text-align: left; }
 .modal-body :is(p,li) { line-height: 1.5; }
-.modal-foot { padding: 14px 22px; border-top: 1px solid var(--border); display: flex; gap: 10px; justify-content: flex-end; }
+.modal-foot { padding: 14px 22px; border-top: 1px solid var(--border); display: flex; gap: 10px; justify-content: flex-end; align-items: center; }
+.modal-foot.has-back { justify-content: space-between; }
+.modal-foot .foot-right { display: flex; gap: 10px; }
 .modal-foot .btn { min-width: 120px; }
-@media (max-width: 480px) { .modal-foot { flex-direction: column-reverse; } .modal-foot .btn { width: 100%; } }
+@media (max-width: 480px) {
+  .modal-foot { flex-direction: column-reverse; align-items: stretch; }
+  .modal-foot.has-back { flex-direction: column-reverse; }
+  .modal-foot .foot-right { flex-direction: column-reverse; }
+  .modal-foot .btn { width: 100%; }
+}
 @keyframes shakeX { 0%,100%{transform:translateX(0)} 20%,60%{transform:translateX(-5px)} 40%,80%{transform:translateX(5px)} }
 .check-line.shake { animation: shakeX .4s; border-color: var(--accent); }
 
