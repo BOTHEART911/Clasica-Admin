@@ -33,6 +33,7 @@ const IC = {
   cal: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>',
   check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>',
   close: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg>',
+  back: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>',
   power: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18.36 6.64a9 9 0 1 1-12.73 0M12 2v10"/></svg>',
   starFill: '<svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>',
   star: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>',
@@ -413,7 +414,7 @@ async function accSeleccion(codigo) {
 
 /* ================= MODAL PROPIO REUTILIZABLE ================= */
 function cerrarModal() { $('modal-root').innerHTML = ''; }
-function abrirModalHtml({ title, html, okText, cancelText = 'Cerrar', onOk, wide }) {
+function abrirModalHtml({ title, html, okText, cancelText = 'Cerrar', onOk, onBack, backText = 'Atrás', wide }) {
   const root = $('modal-root');
   root.innerHTML = `
     <div class="modal-overlay">
@@ -423,17 +424,23 @@ function abrirModalHtml({ title, html, okText, cancelText = 'Cerrar', onOk, wide
           <button class="m-close" data-a="close" aria-label="Cerrar">${IC.close}</button>
         </div>
         <div class="modal-body">${html}</div>
-        <div class="modal-foot">
-          <button class="btn btn-ghost" data-a="cancel">${cancelText}</button>
-          ${okText ? `<button class="btn btn-primary" data-a="ok">${okText}</button>` : ''}
+        <div class="modal-foot ${onBack ? 'has-back' : ''}">
+          ${onBack ? `<button class="btn btn-ghost" data-a="back">${IC.back} ${backText}</button>` : ''}
+          <div class="foot-right">
+            <button class="btn btn-ghost" data-a="cancel">${cancelText}</button>
+            ${okText ? `<button class="btn btn-primary" data-a="ok">${okText}</button>` : ''}
+          </div>
         </div>
       </div>
     </div>`;
   const host = root.querySelector('.modal-card');
   host.querySelectorAll('.check-line input').forEach(inp =>
     inp.addEventListener('change', () => inp.closest('.check-line').classList.toggle('on', inp.checked)));
-  root.querySelector('[data-a="close"]').onclick = cerrarModal;
+  // Si hay "Atrás", la X del encabezado también vuelve (no cierra de una vez).
+  root.querySelector('[data-a="close"]').onclick = onBack || cerrarModal;
   root.querySelector('[data-a="cancel"]').onclick = cerrarModal;
+  const backBtn = root.querySelector('[data-a="back"]');
+  if (backBtn) backBtn.onclick = onBack;
   const okBtn = root.querySelector('[data-a="ok"]');
   if (okBtn) okBtn.onclick = () => onOk && onOk(host);
   return host;
@@ -490,9 +497,10 @@ async function accDocs(codigo) {
       ...(menor ? [['Autorización de menor', d.autorizacion, 'Autorización del acudiente']] : []),
       ['Mención', d.mencion, 'Mención de honor']
     ];
+    const nombre = r ? (r.NOMBRES + ' ' + r.APELLIDOS).trim() : codigo;
     const html = `<div class="doc-list">
       ${docs.map(([t, u, s]) => u
-        ? `<div class="doc-item avail" onclick="verDoc('${escAttr_(u)}','${escAttr_(t)}')">
+        ? `<div class="doc-item avail" onclick="verDoc('${escAttr_(u)}','${escAttr_(t)}','${escAttr_(codigo)}')">
              <span class="doc-ico">${IC.doc}</span>
              <div class="doc-txt"><div class="t">${t}</div><div class="s">${s}</div></div>
              <span class="doc-open">${IC.open}</span>
@@ -503,11 +511,11 @@ async function accDocs(codigo) {
            </div>`).join('')}
     </div>
     <p class="muted mt-md">Toca un documento para verlo sin salir de la app.</p>`;
-    abrirModalHtml({ title: 'Documentos · ' + codigo, html, cancelText: 'Cerrar' });
+    abrirModalHtml({ title: 'Documentos · ' + nombre, html, cancelText: 'Cerrar' });
   } catch (e) { toast(e.message, 'error'); }
 }
 
-function verDoc(url, titulo) {
+function verDoc(url, titulo, codigo) {
   const id = driveId_(url);
   const preview = id ? 'https://drive.google.com/file/d/' + id + '/preview' : url;
   const descarga = id ? 'https://drive.google.com/uc?export=download&id=' + id : url;
@@ -516,7 +524,11 @@ function verDoc(url, titulo) {
     <div class="viewer-bar">
       <a class="btn btn-ghost btn-sm" href="${escAttr_(descarga)}" download>${IC.download} Descargar</a>
     </div>`;
-  abrirModalHtml({ title: titulo, html, cancelText: 'Cerrar', wide: true });
+  abrirModalHtml({
+    title: titulo, html, cancelText: 'Cerrar', wide: true,
+    backText: 'Documentos',
+    onBack: codigo ? () => accDocs(codigo) : cerrarModal
+  });
 }
 
 /* =================================================================
