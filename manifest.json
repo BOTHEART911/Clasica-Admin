@@ -1,13 +1,16 @@
 {
-  "name": "Admin · Clásica 2026",
-  "short_name": "Admin Clásica",
-  "description": "Panel administrador de la Clásica de la Independencia – Flandes 2026",
+  "name": "ADMIN CLÁSICA",
+  "short_name": "ADMIN CLÁSICA",
+  "description": "Panel de administración de la Clásica de la Independencia – Flandes 2026",
+  "scope": "./",
   "start_url": "./index.html",
   "display": "standalone",
-  "background_color": "#14231c",
+  "orientation": "portrait",
+  "background_color": "#f6f2e7",
   "theme_color": "#14231c",
   "icons": [
-    { "src": "https://res.cloudinary.com/dqqeavica/image/upload/v1783207400/clasica_wtdi9j.png", "sizes": "192x192", "type": "image/png" },
-    { "src": "https://res.cloudinary.com/dqqeavica/image/upload/v1783207400/clasica_wtdi9j.png", "sizes": "512x512", "type": "image/png" }
+    { "src": "https://res.cloudinary.com/dqqeavica/image/upload/v1783207400/clasica_wtdi9j.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "https://res.cloudinary.com/dqqeavica/image/upload/v1783207400/clasica_wtdi9j.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "https://res.cloudinary.com/dqqeavica/image/upload/v1783207400/clasica_wtdi9j.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ]
 }
