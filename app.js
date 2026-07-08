@@ -41,7 +41,8 @@ const IC = {
   info: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>',
   edit: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4z"/></svg>',
   open: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6M10 14L21 3"/></svg>',
-  download: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>'
+  download: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>',
+  search: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>'
 };
 
 /* ================= LOADER GLOBAL ================= */
@@ -105,12 +106,21 @@ function parseFecha_(v) {
   if (!v) return null;
   if (v instanceof Date) return isNaN(v) ? null : v;
   const s = String(v).trim();
+  /* Con zona horaria explícita (Z u offset ±HH:MM) respétala: evita el desfase
+     de día/hora cuando una celda de tipo Fecha se serializa como UTC. */
+  if (/[zZ]|[+-]\d{2}:?\d{2}$/.test(s)) {
+    const dz = new Date(s);
+    if (!isNaN(dz)) return dz;
+  }
   let m = s.match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})(?::(\d{2}))?/);
   if (m) return new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +(m[6] || 0));
   m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
   if (m) return new Date(+m[1], +m[2] - 1, +m[3]);
   const d = new Date(s); return isNaN(d) ? null : d;
 }
+/* Escapa HTML y convierte saltos de línea en <br> (texto de comunicados). */
+function escHtml_(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+function nl2br_(s) { return escHtml_(s).replace(/\r\n|\r|\n/g, '<br>'); }
 /* "Domingo, 5 de julio de 2026 - 12:04 PM" */
 function fechaLargaEs_(v) {
   const d = parseFecha_(v); if (!d) return String(v || '—');
@@ -197,6 +207,7 @@ async function doLogin(valor) {
     A.admin = r.admin;
     A.cfg = r.config || {};
     aplicarMarca_();
+    aplicarPermisos_();               // muestra/oculta la pestaña Configuración
     $('adminNombre').textContent = A.admin.nombre;
     $('view-login').classList.remove('active');
     $('appShell').classList.remove('hidden');
@@ -223,6 +234,26 @@ function aplicarMarca_() {
     const bb = $('brandBanner'); if (bb) bb.classList.remove('hidden');
   }
   $('footVersion').textContent = 'v' + (window.APP_VERSION || '1.0.0');
+}
+
+/* ¿Este admin puede ver Configuración? Usa el flag del backend (admin.verConfig);
+   si aún no lo devuelve, cae a la regla PIN 1109 + OSCAR POLANIA. */
+function puedeVerConfig_() {
+  if (!A.admin) return false;
+  if (typeof A.admin.verConfig === 'boolean') return A.admin.verConfig;
+  const pin = String(A.admin.pin == null ? '' : A.admin.pin).replace(/\D/g, '');
+  const nom = String(A.admin.nombre || '').trim().toUpperCase();
+  return pin === '1109' && nom === 'OSCAR POLANIA';
+}
+
+/* Muestra u oculta la pestaña Configuración según el permiso. */
+function aplicarPermisos_() {
+  const puede = puedeVerConfig_();
+  const tab = document.querySelector('.admin-tab[data-tab="config"]');
+  if (tab) tab.style.display = puede ? '' : 'none';
+  if (!puede) {
+    const sec = $('tab-config'); if (sec) sec.classList.remove('active');
+  }
 }
 
 /* ================= WIRE DEL SHELL ================= */
@@ -254,6 +285,7 @@ function wireApp() {
 }
 
 function cambiarTab(name) {
+  if (name === 'config' && !puedeVerConfig_()) return;   // acceso restringido
   $$('.admin-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
   $$('.tabview').forEach(v => v.classList.remove('active'));
   $('tab-' + name).classList.add('active');
@@ -357,8 +389,21 @@ function filtrar() {
   });
 }
 
+/* Contador de total según los filtros activos (categoría + estado + selección). */
+function actualizarContadorFiltro_(n) {
+  const el = $('filtroContador'); if (!el) return;
+  const cat = $('fCategoria').value, est = $('fEstado').value, sel = $('fSeleccion').checked;
+  const partes = [];
+  if (cat) { const c = catDe_(cat); partes.push(c ? c.NOMBRE : cat); }
+  if (est) partes.push(ESTADO_LBL[est] || est);
+  if (sel) partes.push('Selección Flandes');
+  const filtro = partes.length ? ' · ' + partes.join(' · ') : ' · Todos';
+  el.innerHTML = `Total: <b>${n}</b> corredor${n === 1 ? '' : 'es'}<span class="fc-filtro">${filtro}</span>`;
+}
+
 function renderCards() {
   const list = filtrar();
+  actualizarContadorFiltro_(list.length);
   if (!list.length) {
     $('cards').innerHTML = '<div class="empty"><div class="big">Sin resultados</div>Ajusta la búsqueda o los filtros para ver corredores.</div>';
     return;
@@ -542,7 +587,7 @@ function opciones_(arr, sel) {
   }).join('');
 }
 
-function formRegistroHtml_(pre) {
+function formRegistroHtml_(pre, esEdicion) {
   pre = pre || {};
   const deptos = Object.keys(UBICACIONES).sort();
   const rhOpts = (A.rh || []).map(r => ({ value: r.largo, label: r.largo }));
@@ -555,7 +600,13 @@ function formRegistroHtml_(pre) {
   const selFlandes = String(pre.SELECCION_FLANDES).toUpperCase() === 'SI';
   return `
     <div class="form-grid">
-      <div class="fld"><label>Documento</label><input id="f_DOCUMENTO" inputmode="numeric" maxlength="10" value="${escAttr_(pre.DOCUMENTO || '')}" ${pre.DOCUMENTO ? 'readonly' : ''}></div>
+      <div class="fld fld-full"><label>Documento</label>
+        <div class="doc-search">
+          <input id="f_DOCUMENTO" inputmode="numeric" maxlength="10" value="${escAttr_(pre.DOCUMENTO || '')}" ${(pre.DOCUMENTO || esEdicion) ? 'readonly' : ''}>
+          ${esEdicion ? '' : `<button type="button" id="btnBuscarDoc" class="doc-search__btn" aria-label="Consultar documento">${IC.search}<span>Consultar</span></button>`}
+        </div>
+        <div id="docAviso" class="doc-aviso"></div>
+      </div>
       <div class="fld"><label>Nombres</label><input id="f_NOMBRES" style="text-transform:uppercase" value="${escAttr_(pre.NOMBRES || '')}"></div>
       <div class="fld"><label>Apellidos</label><input id="f_APELLIDOS" style="text-transform:uppercase" value="${escAttr_(pre.APELLIDOS || '')}"></div>
       <div class="fld"><label>Género</label><select id="f_GENERO"><option value="">—</option>${opciones_([{ value: 'Masculino', label: 'Masculino' }, { value: 'Femenino', label: 'Femenino' }], g)}</select></div>
@@ -590,7 +641,7 @@ function formRegistroHtml_(pre) {
     </label>`;
 }
 
-function bindFormRegistro_(host, pre) {
+function bindFormRegistro_(host, pre, esEdicion) {
   pre = pre || {};
   A.fechaNac = pre.FECHA_NACIMIENTO ? soloFechaISO_(pre.FECHA_NACIMIENTO) : '';
   A.catActualPref = pre.CAT_PREFIJO || pre.CATEGORIA || '';
@@ -607,6 +658,63 @@ function bindFormRegistro_(host, pre) {
   if (pre.GENERO) { refrescarCategoriasModal_(); $('f_CATEGORIA').value = A.catActualPref; }
   if (pre.DEPARTAMENTO) refrescarMunicipiosModal_(pre.MUNICIPIO);
   if (A.catActualPref) mostrarInfoCategoriaModal_();
+
+  // --- Inscripción nueva: bloquea el resto de campos hasta consultar el documento ---
+  if (!esEdicion) {
+    bloquearCamposRegistro_(true);
+    const btn = $('btnBuscarDoc'); if (btn) btn.onclick = consultarDocumento_;
+    const inp = $('f_DOCUMENTO');
+    inp.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); consultarDocumento_(); } });
+    // Si cambia el documento tras haberlo liberado, se re-bloquea hasta re-consultar.
+    inp.addEventListener('input', () => {
+      bloquearCamposRegistro_(true);
+      const a = $('docAviso'); if (a) { a.className = 'doc-aviso'; a.textContent = ''; }
+    });
+  }
+}
+
+/* Campos que se bloquean hasta consultar el documento (todo menos documento). */
+const CAMPOS_BLOQUEABLES_ = ['f_NOMBRES', 'f_APELLIDOS', 'f_GENERO', 'f_RH', 'f_CELULAR',
+  'f_EPS', 'f_EPS_OTRA', 'f_CORREO', 'f_DEPARTAMENTO', 'f_MUNICIPIO',
+  'f_CONTACTO_EMERGENCIA', 'f_TEL_EMERGENCIA', 'f_CATEGORIA', 'f_ACUDIENTE_DOC',
+  'f_FOTO', 'f_SELECCION', 'btnFecha'];
+
+function bloquearCamposRegistro_(bloquear) {
+  CAMPOS_BLOQUEABLES_.forEach(id => { const el = $(id); if (el) el.disabled = bloquear; });
+  const grid = document.querySelector('#modal-root .form-grid');
+  if (grid) grid.classList.toggle('bloqueado', bloquear);
+  const ok = document.querySelector('#modal-root [data-a="ok"]');
+  if (ok) ok.disabled = bloquear;               // no se puede registrar sin consultar
+}
+
+/* Consulta el documento ANTES de rellenar. Si ya existe → aviso y sigue bloqueado.
+   Si está libre → desbloquea el resto de campos y fija el documento. */
+async function consultarDocumento_() {
+  const inp = $('f_DOCUMENTO'), aviso = $('docAviso');
+  const doc = (inp.value || '').replace(/\D/g, '');
+  if (!/^\d{6,10}$/.test(doc)) {
+    aviso.className = 'doc-aviso warn';
+    aviso.textContent = 'Ingresa un documento válido (6–10 dígitos).';
+    return;
+  }
+  aviso.className = 'doc-aviso'; aviso.textContent = 'Consultando…';
+  try {
+    const rec = await api('obtenerInscrito', { documento: doc });
+    if (rec) {
+      aviso.className = 'doc-aviso err';
+      aviso.innerHTML = `⚠️ <b>Ya está registrado:</b> ${escHtml_((rec.NOMBRES || '') + ' ' + (rec.APELLIDOS || ''))} · Dorsal <b>${escHtml_(rec.CODIGO || '—')}</b>. No es necesario volver a inscribirlo.`;
+      bloquearCamposRegistro_(true);
+      inp.removeAttribute('readonly');           // permite corregir y reconsultar
+    } else {
+      aviso.className = 'doc-aviso ok';
+      aviso.textContent = '✓ Documento libre. Completa el resto de los campos.';
+      bloquearCamposRegistro_(false);
+      inp.setAttribute('readonly', 'readonly');  // fija el documento consultado
+    }
+  } catch (e) {
+    aviso.className = 'doc-aviso err';
+    aviso.textContent = e.message;
+  }
 }
 
 function refrescarCategoriasModal_() {
@@ -688,7 +796,7 @@ function abrirRegistroModal_(pre, { esEdicion }) {
   const okText = esEdicion ? 'Guardar cambios' : 'Registrar corredor';
   const host = abrirModalHtml({
     title, wide: true, okText, cancelText: 'Cancelar',
-    html: formRegistroHtml_(pre || {}),
+    html: formRegistroHtml_(pre || {}, esEdicion),
     onOk: async (h) => {
       const f = await recolectarRegistro_(pre);
       const errs = validarRegistro_(f);
@@ -706,7 +814,7 @@ function abrirRegistroModal_(pre, { esEdicion }) {
       }
     }
   });
-  bindFormRegistro_(host, pre || {});
+  bindFormRegistro_(host, pre || {}, esEdicion);
 }
 
 function abrirInscribir() { abrirRegistroModal_({}, { esEdicion: false }); }
@@ -917,12 +1025,12 @@ async function renderComunicadosAdmin() {
     return `<div class="com ${dest ? 'dest' : ''}">
       <div class="com-head">
         <div>
-          <h4>${c.TITULO}${dest ? '<span class="badge-dest">Destacado</span>' : ''}</h4>
-          <div class="fecha">${fechaLargaEs_(c.FECHA)} · ${c.AUTOR || 'Comité'}</div>
+          <h4>${escHtml_(c.TITULO)}${dest ? '<span class="badge-dest">Destacado</span>' : ''}</h4>
+          <div class="fecha">${c.FECHA_FMT || fechaLargaEs_(c.FECHA)} · ${escHtml_(c.AUTOR || 'Comité')}</div>
         </div>
         <button class="link-del" onclick="eliminarCom('${c.ID}')">Eliminar</button>
       </div>
-      <div class="cuerpo">${(c.CUERPO || '').replace(/\n/g, '<br>')}</div>
+      <div class="cuerpo">${nl2br_(c.CUERPO)}</div>
       ${c.IMAGEN_URL ? `<img class="com-img" src="${driveImg_(c.IMAGEN_URL)}" alt="">` : ''}
     </div>`;
   }).join('') : '<div class="empty"><div class="big">Sin comunicados</div>Publica el primero desde el formulario de arriba.</div>';
