@@ -496,3 +496,34 @@ main { max-width: var(--container-max); margin: 0 auto; padding: 18px 14px calc(
 .brand-banner { display: flex; justify-content: center; align-items: center; padding: 8px 16px 0; }
 .brand-banner img { max-width: 100%; max-height: 60px; width: auto; object-fit: contain; }
 .foot { text-align: center; padding: 16px; font-size: .72rem; color: var(--text-muted); letter-spacing: .04em; }
+
+/* ===== Inscritos: contador de total según filtros ===== */
+.filtro-contador {
+  margin: 0 2px 12px; padding: 8px 14px;
+  background: var(--bg-card); border: 1px solid var(--linea);
+  border-left: 3px solid var(--accent); border-radius: var(--r-md);
+  font-size: .9rem; color: var(--text-main);
+}
+.filtro-contador b { color: var(--accent-2); font-size: 1.05rem; }
+.filtro-contador .fc-filtro { color: var(--text-muted); }
+
+/* ===== Inscribir: búsqueda de documento + bloqueo de campos ===== */
+.doc-search { display: flex; gap: 8px; align-items: stretch; }
+.doc-search input { flex: 1 1 auto; }
+.doc-search__btn {
+  flex: 0 0 auto; display: inline-flex; align-items: center; gap: 6px;
+  padding: 0 14px; border-radius: var(--r-md);
+  background: var(--accent); color: var(--primary); font-weight: 700;
+  border: 1px solid var(--accent-2); cursor: pointer; white-space: nowrap;
+}
+.doc-search__btn svg { width: 18px; height: 18px; }
+.doc-search__btn:hover { background: var(--accent-2); color: #fff; }
+
+.doc-aviso { margin-top: 6px; font-size: .85rem; line-height: 1.4; }
+.doc-aviso.ok   { color: #1e7a46; }
+.doc-aviso.err  { color: #c0392b; }
+.doc-aviso.warn { color: var(--accent-2); }
+
+.form-grid.bloqueado { opacity: .55; }
+.form-grid.bloqueado .doc-search,
+.form-grid.bloqueado #f_DOCUMENTO { opacity: 1; }
